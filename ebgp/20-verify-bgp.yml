@@ -1,5 +1,6 @@
 ---
-# Verify every eBGP session is Established. Fails loudly if any peer is down.
+# Verify every expected eBGP peer is present AND Established.
+# Fails if BGP is disabled / zero peers, or any peer not Established.
 - name: Verify eBGP sessions
   hosts: spine:leaf
   gather_facts: false
@@ -9,11 +10,15 @@
         commands: ["show ip bgp summary | json"]
       register: bgpsum
 
-    - name: Parse peers not in Established
+    - name: Assert all fabric peers Established
       vars:
-        vrfs: "{{ bgpsum.stdout[0].vrfs.default.peers | default({}) }}"
-        down: "{{ vrfs | dict2items | rejectattr('value.peerState','equalto','Established') | map(attribute='key') | list }}"
+        peers: "{{ bgpsum.stdout[0].vrfs.default.peers | default({}) }}"
+        expected: "{{ p2p_links | length }}"
+        established: "{{ peers | dict2items | selectattr('value.peerState','equalto','Established') | list | length }}"
+        down: "{{ peers | dict2items | rejectattr('value.peerState','equalto','Established') | map(attribute='key') | list }}"
       ansible.builtin.assert:
-        that: "down | length == 0"
-        success_msg: "{{ inventory_hostname }}: all {{ vrfs | length }} eBGP peers Established"
-        fail_msg: "{{ inventory_hostname }}: peers NOT established -> {{ down }}"
+        that:
+          - "peers | length | int == expected | int"
+          - "established | int == expected | int"
+        success_msg: "{{ inventory_hostname }}: all {{ expected }} eBGP peers Established"
+        fail_msg: "{{ inventory_hostname }}: {{ peers | length }}/{{ expected }} peers, {{ established }} Established; down/missing -> {{ down }}"
