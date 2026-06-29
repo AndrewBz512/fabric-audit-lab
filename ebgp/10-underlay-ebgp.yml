@@ -34,15 +34,38 @@
           - router-id {{ loopback0 }}
           - maximum-paths {{ ecmp_paths }}
           - network {{ loopback0 }}/32
-          - "{{ 'network ' + item.ip + '/31' }}"
+          - "{{ 'network ' ~ item.ip ~ '/31' }}"
         # one pass adds router-id/maxpaths/loopback; the loop adds each p2p network
       loop: "{{ p2p_links }}"
       loop_control: { label: "advertise {{ item.ip }}/31" }
 
     - name: BGP neighbors (eBGP to each fabric peer)
+      # Full-expression (~) form: survives the new ansible-core pre-loop arg
+      # finalization AND coerces the integer peer_asn. Partial-template
+      # "remote-as {{ item.peer_asn }}" raised "'item' is undefined" under
+      # ansible-core 2.21's lazy templater.
       arista.eos.eos_config:
         parents: "router bgp {{ bgp_asn }}"
         lines:
-          - neighbor {{ item.peer_ip }} remote-as {{ item.peer_asn }}
-          - neighbor {{ item.peer_ip }} description {{ item.peer }}
-          - neighbor {{ item.peer_ip }} maximum-
+          - "{{ 'neighbor ' ~ item.peer_ip ~ ' remote-as ' ~ item.peer_asn }}"
+          - "{{ 'neighbor ' ~ item.peer_ip ~ ' description ' ~ item.peer }}"
+          - "{{ 'neighbor ' ~ item.peer_ip ~ ' maximum-routes 12000' }}"
+      loop: "{{ p2p_links }}"
+      loop_control: { label: "peer {{ item.peer }}" }
+
+    - name: Activate neighbors under IPv4 unicast AF (multi-agent model)
+      # cEOS runs 'service routing protocols model multi-agent'; without an
+      # activated address-family the default-VRF BGP shows "disabled" and no
+      # sessions form. This block is the activation that makes eBGP come up.
+      arista.eos.eos_config:
+        parents:
+          - "router bgp {{ bgp_asn }}"
+          - "address-family ipv4"
+        lines:
+          - "{{ 'neighbor ' ~ item.peer_ip ~ ' activate' }}"
+      loop: "{{ p2p_links }}"
+      loop_control: { label: "activate {{ item.peer_ip }}" }
+
+    - name: Save running-config
+      arista.eos.eos_config:
+        save_when: modified
