@@ -1,0 +1,18 @@
+# Confirm mgmt IPs with:  sudo containerlab inspect --all  (clab mgmt net 172.20.20.0/24)
+all:
+  vars:
+    ansible_connection: ansible.netcommon.network_cli
+    ansible_network_os: arista.eos.eos
+    ansible_user: admin
+    ansible_password: admin
+    ansible_become: true
+    ansible_become_method: enable
+  children:
+    spine:
+      hosts:
+        spine1: { ansible_host: 172.20.20.11 }
+        spine2: { ansible_host: 172.20.20.12 }
+    leaf:
+      hosts:
+        leaf1: { ansible_host: 172.20.20.21 }
+        leaf2: { ansible_host: 172.20.20.22 }

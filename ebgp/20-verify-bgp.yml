@@ -1,0 +1,19 @@
+---
+# Verify every eBGP session is Established. Fails loudly if any peer is down.
+- name: Verify eBGP sessions
+  hosts: spine:leaf
+  gather_facts: false
+  tasks:
+    - name: Collect BGP summary (JSON)
+      arista.eos.eos_command:
+        commands: ["show ip bgp summary | json"]
+      register: bgpsum
+
+    - name: Parse peers not in Established
+      vars:
+        vrfs: "{{ bgpsum.stdout[0].vrfs.default.peers | default({}) }}"
+        down: "{{ vrfs | dict2items | rejectattr('value.peerState','equalto','Established') | map(attribute='key') | list }}"
+      ansible.builtin.assert:
+        that: "down | length == 0"
+        success_msg: "{{ inventory_hostname }}: all {{ vrfs | length }} eBGP peers Established"
+        fail_msg: "{{ inventory_hostname }}: peers NOT established -> {{ down }}"

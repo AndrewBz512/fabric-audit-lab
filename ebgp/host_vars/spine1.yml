@@ -1,0 +1,5 @@
+bgp_asn: 65100
+loopback0: 10.255.0.1
+p2p_links:
+  - { intf: Ethernet1, ip: 10.0.0.0,  peer: leaf1, peer_ip: 10.0.0.1,  peer_asn: 65001 }
+  - { intf: Ethernet2, ip: 10.0.0.2,  peer: leaf2, peer_ip: 10.0.0.3,  peer_asn: 65002 }

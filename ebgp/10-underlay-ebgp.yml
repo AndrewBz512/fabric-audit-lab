@@ -1,0 +1,48 @@
+---
+# Phase 1b — configure eBGP Clos underlay on the cEOS fabric.
+# Idempotent (eos_config only pushes diffs). Run: ansible-playbook 10-underlay-ebgp.yml
+- name: eBGP underlay
+  hosts: spine:leaf
+  gather_facts: false
+  tasks:
+    - name: Loopback0 (router-id / advertised /32)
+      arista.eos.eos_config:
+        parents: interface Loopback0
+        lines:
+          - ip address {{ loopback0 }}/32
+
+    - name: Point-to-point fabric interfaces (routed /31)
+      arista.eos.eos_config:
+        parents: "interface {{ item.intf }}"
+        lines:
+          - no switchport
+          - ip address {{ item.ip }}/31
+          - mtu 9214
+      loop: "{{ p2p_links }}"
+      loop_control: { label: "{{ item.intf }} -> {{ item.peer }}" }
+
+    - name: BGP process + ECMP + advertise underlay
+      arista.eos.eos_config:
+        parents: "router bgp {{ bgp_asn }}"
+        lines:
+          - router-id {{ loopback0 }}
+          - maximum-paths {{ ecmp_paths }}
+          - network {{ loopback0 }}/32
+          - "{{ 'network ' + item.ip + '/31' }}"
+        # one pass adds router-id/maxpaths/loopback; the loop adds each p2p network
+      loop: "{{ p2p_links }}"
+      loop_control: { label: "advertise {{ item.ip }}/31" }
+
+    - name: BGP neighbors (eBGP to each fabric peer)
+      arista.eos.eos_config:
+        parents: "router bgp {{ bgp_asn }}"
+        lines:
+          - neighbor {{ item.peer_ip }} remote-as {{ item.peer_asn }}
+          - neighbor {{ item.peer_ip }} description {{ item.peer }}
+          - neighbor {{ item.peer_ip }} maximum-routes 12000
+      loop: "{{ p2p_links }}"
+      loop_control: { label: "peer {{ item.peer }} ({{ item.peer_asn }})" }
+
+    - name: Save running-config
+      arista.eos.eos_config:
+        save_when: modified

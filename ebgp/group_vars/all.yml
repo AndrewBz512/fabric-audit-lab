@@ -1,0 +1,4 @@
+# Clos eBGP underlay — global knobs
+ecmp_paths: 4
+# advertise these prefixes into BGP via network statements
+# (loopbacks + p2p are defined per-host below)

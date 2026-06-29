@@ -1,0 +1,3 @@
+collections:
+  - name: arista.eos
+  - name: ansible.netcommon

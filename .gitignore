@@ -1,0 +1,10 @@
+*.env
+*vault*
+*_ed25519
+*.key
+*.pem
+*.retry
+__pycache__/
+collections/
+*.log
+known_hosts*
