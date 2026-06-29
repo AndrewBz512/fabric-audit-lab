@@ -5,6 +5,12 @@
   hosts: spine:leaf
   gather_facts: false
   tasks:
+    - name: Enable IP routing (cEOS boots as an L2 switch)
+      # Without this, the default VRF shows "BGP is disabled" and nothing routes.
+      arista.eos.eos_config:
+        lines:
+          - ip routing
+
     - name: Loopback0 (router-id / advertised /32)
       arista.eos.eos_config:
         parents: interface Loopback0
@@ -39,10 +45,4 @@
         lines:
           - neighbor {{ item.peer_ip }} remote-as {{ item.peer_asn }}
           - neighbor {{ item.peer_ip }} description {{ item.peer }}
-          - neighbor {{ item.peer_ip }} maximum-routes 12000
-      loop: "{{ p2p_links }}"
-      loop_control: { label: "peer {{ item.peer }} ({{ item.peer_asn }})" }
-
-    - name: Save running-config
-      arista.eos.eos_config:
-        save_when: modified
+          - neighbor {{ item.peer_ip }} maximum-
