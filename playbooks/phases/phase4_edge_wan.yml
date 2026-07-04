@@ -1,0 +1,81 @@
+# Phase 4 — Edge/WAN (IOS): PAT overload, inside-network ACL, default route.
+#
+# GAP NOTE: raw `ios_config` blocks (not resource modules) so classic IOSv on
+# PNetLab works. wan_default_gateway must match the lab's cloud/NAT next hop.
+---
+- name: "Phase 4 — Edge WAN (NAT/PAT, ACL, default route)"
+  hosts: edge
+  gather_facts: false
+  tags: [phase4]
+
+  tasks:
+    - name: Phase 4 configuration
+      block:
+        - name: ACL of inside networks eligible for NAT
+          cisco.ios.ios_config:
+            lines:
+              - "access-list {{ nat_acl_number }} permit {{ item }}"
+          loop: "{{ nat_inside_networks }}"
+
+        - name: Mark inside interface
+          cisco.ios.ios_config:
+            lines:
+              - ip nat inside
+              - no shutdown
+            parents: "interface {{ nat_inside_interface }}"
+
+        - name: Mark outside interface
+          cisco.ios.ios_config:
+            lines:
+              - ip nat outside
+              - no shutdown
+            parents: "interface {{ nat_outside_interface }}"
+
+        - name: PAT overload on the outside interface
+          cisco.ios.ios_config:
+            lines:
+              - "ip nat inside source list {{ nat_acl_number }} interface {{ nat_outside_interface }} overload"
+
+        - name: Default route toward the WAN
+          cisco.ios.ios_config:
+            lines:
+              - "ip route 0.0.0.0 0.0.0.0 {{ wan_default_gateway }}"
+
+        # ---- verify ----
+        - name: Collect NAT statistics and routing table
+          cisco.ios.ios_command:
+            commands:
+              - show ip nat statistics
+              - show ip route static
+          register: edge_out
+
+        - name: Assert NAT is bound to the outside interface and default route exists
+          ansible.builtin.assert:
+            that:
+              - edge_out.stdout[0] is search(nat_outside_interface)
+              - edge_out.stdout[1] is search('0\.0\.0\.0')
+            fail_msg: "NAT/default-route verification failed on {{ inventory_hostname }}"
+            quiet: true
+
+        - name: Save running-config
+          cisco.ios.ios_config:
+            save_when: modified
+
+        - name: Report success to N8N
+          ansible.builtin.include_tasks: ../tasks/notify_n8n.yml
+          vars:
+            phase_id: phase4
+            phase_status: success
+            phase_detail: "PAT overload on {{ nat_outside_interface }} + default route via {{ wan_default_gateway }}"
+
+      rescue:
+        - name: Report failure to N8N
+          ansible.builtin.include_tasks: ../tasks/notify_n8n.yml
+          vars:
+            phase_id: phase4
+            phase_status: failed
+            phase_detail: "{{ ansible_failed_task.name | default('unknown task') }} failed on {{ inventory_hostname }}"
+
+        - name: Fail the phase (gate for site.yml)
+          ansible.builtin.fail:
+            msg: "Phase 4 failed — see task output above."

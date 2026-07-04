@@ -1,0 +1,105 @@
+# PNetLab lab inventory — 11 network devices + 2 Linux clients on 172.100.1.0/24
+# (PNetLab mgmt net, reached from devbox-104 via 192.168.1.11).
+#
+# IMPORTANT — GAP: the addresses below are the PLANNED assignments. Before the
+# first run, confirm each node's actual management IP in the PNetLab UI
+# (Lab -> right-click node -> Management IP) and update ansible_host here.
+#
+# Credentials come from Ansible Vault (NOT committed):
+#   inventory/group_vars/all/vault.yml
+#     vault_device_password: <pnetlab_device_password>
+#     vault_client_password: ubuntu
+all:
+  children:
+    # ------------------------------------------------------------------
+    # Phase 1 — Core / Access switching (IOS)
+    # ------------------------------------------------------------------
+    core:
+      hosts:
+        core1:   { ansible_host: 172.100.1.101 }
+        core2:   { ansible_host: 172.100.1.102 }
+    access:
+      hosts:
+        access1: { ansible_host: 172.100.1.103 }
+        access2: { ansible_host: 172.100.1.104 }
+    core_access:
+      children:
+        core:
+        access:
+
+    # ------------------------------------------------------------------
+    # Phase 2 — Distribution routing / OSPF underlay (IOS)
+    # ------------------------------------------------------------------
+    distribution:
+      hosts:
+        dist1: { ansible_host: 172.100.1.111 }
+        dist2: { ansible_host: 172.100.1.112 }
+
+    # ------------------------------------------------------------------
+    # Phase 3 — Spine/Leaf overlay, BGP EVPN + VXLAN (NX-OS)
+    # ------------------------------------------------------------------
+    spine:
+      hosts:
+        spine1: { ansible_host: 172.100.1.121 }
+        spine2: { ansible_host: 172.100.1.122 }
+    leaf:
+      hosts:
+        leaf1: { ansible_host: 172.100.1.123 }
+        leaf2: { ansible_host: 172.100.1.124 }
+    spine_leaf:
+      children:
+        spine:
+        leaf:
+
+    # ------------------------------------------------------------------
+    # Phase 4 — Edge / WAN, NAT + ACL (IOS)
+    # ------------------------------------------------------------------
+    edge:
+      hosts:
+        edge1: { ansible_host: 172.100.1.131 }
+
+    # ------------------------------------------------------------------
+    # Phase 5 — Linux client VMs (SSH)
+    # ------------------------------------------------------------------
+    clients:
+      hosts:
+        client1: { ansible_host: 172.100.1.141 }
+        client2: { ansible_host: 172.100.1.142 }
+
+    # ---- connection-profile groups ----
+    ios_devices:
+      children:
+        core_access:
+        distribution:
+        edge:
+      vars:
+        ansible_connection: ansible.netcommon.network_cli
+        ansible_network_os: cisco.ios.ios
+        ansible_user: admin
+        ansible_password: "{{ vault_device_password }}"
+        ansible_become: true
+        ansible_become_method: enable
+        ansible_become_password: "{{ vault_device_password }}"
+
+    nxos_devices:
+      children:
+        spine_leaf:
+      vars:
+        ansible_connection: ansible.netcommon.network_cli
+        ansible_network_os: cisco.nxos.nxos
+        ansible_user: admin
+        ansible_password: "{{ vault_device_password }}"
+        ansible_become: true
+        ansible_become_method: enable
+        ansible_become_password: "{{ vault_device_password }}"
+
+    linux_clients:
+      children:
+        clients:
+      vars:
+        ansible_connection: ansible.builtin.ssh
+        ansible_user: ubuntu
+        ansible_password: "{{ vault_client_password }}"
+        ansible_become: true
+        ansible_become_method: sudo
+        ansible_become_password: "{{ vault_client_password }}"

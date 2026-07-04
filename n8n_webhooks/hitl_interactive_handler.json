@@ -1,0 +1,233 @@
+{
+  "name": "PNetLab HITL Interactive Handler",
+  "nodes": [
+    {
+      "id": "da88ba92-887b-40c0-9acd-d696610325c3",
+      "name": "Slack Interactivity",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "hitl-interactive",
+        "responseMode": "responseNode"
+      },
+      "webhookId": "faa9d4ec-cb41-4ddb-ac24-1aefcc2ecab4"
+    },
+    {
+      "id": "bbf2a9ca-1dd3-4e28-8cb4-8083ec97427c",
+      "name": "Parse Interaction",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "jsCode": "// Slack interactivity POSTs form-encoded `payload=<json>`\nconst raw = $input.first().json.body?.payload;\nif (!raw) { return []; }\nconst p = typeof raw === 'string' ? JSON.parse(raw) : raw;\nconst action = (p.actions && p.actions[0]) || {};\nlet value = {};\ntry { value = JSON.parse(action.value ?? '{}'); } catch (e) { value = { raw: action.value }; }\nconst id = (action.action_id || '').toLowerCase();\nconst decision = id.includes('approve') ? 'approved'\n               : id.includes('reject') ? 'rejected' : 'unknown';\nreturn [{ json: {\n  decision,\n  callback_url: value.callback_url ?? null,   // GAP: confirm CW HITL Gateway _RT/_CB token pattern\n  token: value.token ?? value._RT ?? value._CB ?? null,\n  request_id: value.request_id ?? null,\n  user: p.user?.username ?? p.user?.id ?? 'unknown',\n  response_url: p.response_url ?? null,\n  original_text: p.message?.text ?? '',\n}}];\n"
+      }
+    },
+    {
+      "id": "3de22fea-442b-4019-8332-f09f1ca56ec3",
+      "name": "Respond 200",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        300
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ok: true}) }}"
+      }
+    },
+    {
+      "id": "209ab285-4c53-4521-b9ed-12e26b6be532",
+      "name": "Has Callback URL?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        720,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.callback_url }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "fb1ec8c5-79fa-4a53-ad7c-e15a8abc103a",
+      "name": "Agent Callback",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        180
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.callback_url }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({decision: $json.decision, token: $json.token, request_id: $json.request_id, user: $json.user, source: \"slack-hitl\", ts: $now.toISO()}) }}",
+        "options": {
+          "timeout": 10000
+        }
+      }
+    },
+    {
+      "id": "2fb09a49-a181-4889-adf1-a8c6132a326e",
+      "name": "Warn No Callback",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        960,
+        420
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0BENNUJJT1",
+          "mode": "id"
+        },
+        "text": "=\u26a0\ufe0f HITL `{{ $json.decision }}` by @{{ $json.user }} received but the button payload had no `callback_url` \u2014 the agent was NOT notified. Check the _RT/_CB token wiring in the CW HITL Gateway.",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "REPLACE_AFTER_IMPORT",
+          "name": "Slack Bot (ops-agent)"
+        }
+      }
+    },
+    {
+      "id": "64027a4d-f78e-47d9-a95d-f5b795188195",
+      "name": "Update Slack Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        180
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Parse Interaction').first().json.response_url }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({replace_original: true, text: ($json.decision === \"approved\" ? \"\u2705 Approved\" : \"\u26d4 Rejected\") + \" by @\" + $json.user + \" \u2014 agent notified.\"}) }}",
+        "options": {
+          "timeout": 10000
+        }
+      }
+    },
+    {
+      "id": "8445497e-6b45-46df-99fa-343e99c3ab37",
+      "name": "Note 988357ee",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -520,
+        150
+      ],
+      "parameters": {
+        "content": "## HITL Approve/Reject handler\nSlack Interactivity -> `/webhook/hitl-interactive`.\n\nButton `value` is expected to be JSON: `{callback_url, token, request_id}` (CW HITL Gateway _RT/_CB pattern \u2014 **OPEN GAP**, confirm before production).\n\nOn decision: POST to callback_url, then rewrite the original Slack message via response_url.\n\nNOTE (risk register): Slack requires the Interactivity Request URL to be public \u2014 expose :5678 via Cloudflare Tunnel or a VPS reverse proxy; LAN-only .104 will not receive button clicks.",
+        "width": 460,
+        "height": 320
+      }
+    }
+  ],
+  "connections": {
+    "Slack Interactivity": {
+      "main": [
+        [
+          {
+            "node": "Parse Interaction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Interaction": {
+      "main": [
+        [
+          {
+            "node": "Respond 200",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond 200": {
+      "main": [
+        [
+          {
+            "node": "Has Callback URL?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Callback URL?": {
+      "main": [
+        [
+          {
+            "node": "Agent Callback",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Warn No Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent Callback": {
+      "main": [
+        [
+          {
+            "node": "Update Slack Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false,
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

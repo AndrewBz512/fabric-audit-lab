@@ -1,0 +1,910 @@
+{
+  "name": "PNetLab Phase Orchestrator",
+  "nodes": [
+    {
+      "id": "2033c989-f1e2-483e-9a96-5215b454dca6",
+      "name": "Phase 1 Start",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "phase1-start",
+        "responseMode": "responseNode"
+      },
+      "webhookId": "8bc2958c-a13b-43a3-9a49-e66c6e69d1d5"
+    },
+    {
+      "id": "85b11052-10ed-43ca-8d45-73f7a967422e",
+      "name": "Ack P1 Start",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        260,
+        0
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({received: true, phase: $json.body.phase ?? null, status: $json.body.status ?? null}) }}"
+      }
+    },
+    {
+      "id": "512c4014-4dc5-424c-965c-f38f0de07240",
+      "name": "Announce P1 Start",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        520,
+        0
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0BENNUJJT1",
+          "mode": "id"
+        },
+        "text": "=\u25b6\ufe0f *Phase 1 \u2014 Core Switching (VLANs/STP)* started (`{{ $json.body.status ?? \"manual\" }}`)",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "REPLACE_AFTER_IMPORT",
+          "name": "Slack Bot (ops-agent)"
+        }
+      }
+    },
+    {
+      "id": "46f6419f-4185-4536-b447-b5519eba3728",
+      "name": "Phase 1 Result",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        110
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "phase1-result",
+        "responseMode": "responseNode"
+      },
+      "webhookId": "954b7ff3-418f-4483-9918-54fb475b8949"
+    },
+    {
+      "id": "cdb440b9-bc13-461f-b2dc-2a28638c75b8",
+      "name": "Ack P1 Result",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        260,
+        110
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({received: true, phase: $json.body.phase ?? null, status: $json.body.status ?? null}) }}"
+      }
+    },
+    {
+      "id": "a8d03a7d-5fba-4eaa-afd7-0893910a5e08",
+      "name": "Post P1 Result",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        520,
+        110
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0BENNUJJT1",
+          "mode": "id"
+        },
+        "text": "={{ ($json.body.status === \"success\" ? \"\u2705\" : \"\u274c\") }} *Phase 1 \u2014 Core Switching (VLANs/STP)*: `{{ $json.body.status }}`\n{{ $json.body.detail ?? \"\" }}",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "REPLACE_AFTER_IMPORT",
+          "name": "Slack Bot (ops-agent)"
+        }
+      }
+    },
+    {
+      "id": "d6c26aee-9813-4794-baf8-33b8d1d23bc5",
+      "name": "Phase 2 Start",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        220
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "phase2-start",
+        "responseMode": "responseNode"
+      },
+      "webhookId": "e837f1a8-68df-49be-a77a-edf835cffab9"
+    },
+    {
+      "id": "52cd9f8c-f196-4366-932c-e0c5250b3ee2",
+      "name": "Ack P2 Start",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        260,
+        220
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({received: true, phase: $json.body.phase ?? null, status: $json.body.status ?? null}) }}"
+      }
+    },
+    {
+      "id": "fe2205be-e42b-4d20-be51-3c62f206bebd",
+      "name": "Announce P2 Start",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        520,
+        220
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0BENNUJJT1",
+          "mode": "id"
+        },
+        "text": "=\u25b6\ufe0f *Phase 2 \u2014 Routing Underlay (OSPF)* started (`{{ $json.body.status ?? \"manual\" }}`)",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "REPLACE_AFTER_IMPORT",
+          "name": "Slack Bot (ops-agent)"
+        }
+      }
+    },
+    {
+      "id": "d8765b0a-32b7-4a35-b316-e18217e990f4",
+      "name": "Phase 2 Result",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        330
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "phase2-result",
+        "responseMode": "responseNode"
+      },
+      "webhookId": "fccd4a01-f9da-4417-8da4-52bb95f4a22d"
+    },
+    {
+      "id": "ae8fede4-8d8d-47bc-9fb2-a5dec052c637",
+      "name": "Ack P2 Result",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        260,
+        330
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({received: true, phase: $json.body.phase ?? null, status: $json.body.status ?? null}) }}"
+      }
+    },
+    {
+      "id": "db54db1a-b17f-4c60-9276-f87eccfc4a1b",
+      "name": "Post P2 Result",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        520,
+        330
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0BENNUJJT1",
+          "mode": "id"
+        },
+        "text": "={{ ($json.body.status === \"success\" ? \"\u2705\" : \"\u274c\") }} *Phase 2 \u2014 Routing Underlay (OSPF)*: `{{ $json.body.status }}`\n{{ $json.body.detail ?? \"\" }}",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "REPLACE_AFTER_IMPORT",
+          "name": "Slack Bot (ops-agent)"
+        }
+      }
+    },
+    {
+      "id": "e289c055-0ca0-4a02-864f-e18ae4cc7d07",
+      "name": "Phase 3 Start",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        440
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "phase3-start",
+        "responseMode": "responseNode"
+      },
+      "webhookId": "656051fd-963a-467d-89ab-9e2fdeb85e8a"
+    },
+    {
+      "id": "3ce85d24-1b2c-4168-9568-5ff254f33449",
+      "name": "Ack P3 Start",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        260,
+        440
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({received: true, phase: $json.body.phase ?? null, status: $json.body.status ?? null}) }}"
+      }
+    },
+    {
+      "id": "cc6f6879-14a1-4ea3-bc6e-1364e5fc3c29",
+      "name": "Announce P3 Start",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        520,
+        440
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0BENNUJJT1",
+          "mode": "id"
+        },
+        "text": "=\u25b6\ufe0f *Phase 3 \u2014 Overlay VXLAN/EVPN* started (`{{ $json.body.status ?? \"manual\" }}`)",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "REPLACE_AFTER_IMPORT",
+          "name": "Slack Bot (ops-agent)"
+        }
+      }
+    },
+    {
+      "id": "18f22f56-b899-4643-84d3-8b50c1b1e00e",
+      "name": "Phase 3 Result",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        550
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "phase3-result",
+        "responseMode": "responseNode"
+      },
+      "webhookId": "9377c32a-af61-47f4-bf46-50209eb67b47"
+    },
+    {
+      "id": "93423cfd-6f91-427d-ba0a-2f9089d8617e",
+      "name": "Ack P3 Result",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        260,
+        550
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({received: true, phase: $json.body.phase ?? null, status: $json.body.status ?? null}) }}"
+      }
+    },
+    {
+      "id": "44cfd972-db41-4514-b363-09343468a15e",
+      "name": "Post P3 Result",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        520,
+        550
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0BENNUJJT1",
+          "mode": "id"
+        },
+        "text": "={{ ($json.body.status === \"success\" ? \"\u2705\" : \"\u274c\") }} *Phase 3 \u2014 Overlay VXLAN/EVPN*: `{{ $json.body.status }}`\n{{ $json.body.detail ?? \"\" }}",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "REPLACE_AFTER_IMPORT",
+          "name": "Slack Bot (ops-agent)"
+        }
+      }
+    },
+    {
+      "id": "054b786d-16de-4253-9f74-350c9d4352a9",
+      "name": "Phase 4 Start",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        660
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "phase4-start",
+        "responseMode": "responseNode"
+      },
+      "webhookId": "2ce6ea0a-3124-45da-bdf3-84f6f3d4a441"
+    },
+    {
+      "id": "05a6ae35-1563-4086-85f4-03789b049986",
+      "name": "Ack P4 Start",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        260,
+        660
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({received: true, phase: $json.body.phase ?? null, status: $json.body.status ?? null}) }}"
+      }
+    },
+    {
+      "id": "59dac6f8-b2b2-4cd2-8962-b72ea2ad7d6f",
+      "name": "Announce P4 Start",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        520,
+        660
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0BENNUJJT1",
+          "mode": "id"
+        },
+        "text": "=\u25b6\ufe0f *Phase 4 \u2014 Edge WAN (NAT)* started (`{{ $json.body.status ?? \"manual\" }}`)",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "REPLACE_AFTER_IMPORT",
+          "name": "Slack Bot (ops-agent)"
+        }
+      }
+    },
+    {
+      "id": "cb83ea1a-2ff3-4504-a674-e72a56ad0f9a",
+      "name": "Phase 4 Result",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        770
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "phase4-result",
+        "responseMode": "responseNode"
+      },
+      "webhookId": "b3e969eb-dc62-4046-a70c-5b9d8655abbd"
+    },
+    {
+      "id": "f5926660-3b59-4f7a-9df0-a069e067b845",
+      "name": "Ack P4 Result",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        260,
+        770
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({received: true, phase: $json.body.phase ?? null, status: $json.body.status ?? null}) }}"
+      }
+    },
+    {
+      "id": "9f248397-31b1-4171-a8ce-94c25c5331c4",
+      "name": "Post P4 Result",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        520,
+        770
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0BENNUJJT1",
+          "mode": "id"
+        },
+        "text": "={{ ($json.body.status === \"success\" ? \"\u2705\" : \"\u274c\") }} *Phase 4 \u2014 Edge WAN (NAT)*: `{{ $json.body.status }}`\n{{ $json.body.detail ?? \"\" }}",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "REPLACE_AFTER_IMPORT",
+          "name": "Slack Bot (ops-agent)"
+        }
+      }
+    },
+    {
+      "id": "18d75cf7-137c-40b4-8646-4231c999b72a",
+      "name": "Phase 5 Start",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        880
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "phase5-start",
+        "responseMode": "responseNode"
+      },
+      "webhookId": "0f4d6fa9-caf7-43c8-a315-b6107445a882"
+    },
+    {
+      "id": "32450302-6416-46ab-98cd-c175fefd8c68",
+      "name": "Ack P5 Start",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        260,
+        880
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({received: true, phase: $json.body.phase ?? null, status: $json.body.status ?? null}) }}"
+      }
+    },
+    {
+      "id": "840c3161-331f-4e62-9ac8-67b8f8dac94d",
+      "name": "Announce P5 Start",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        520,
+        880
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0BENNUJJT1",
+          "mode": "id"
+        },
+        "text": "=\u25b6\ufe0f *Phase 5 \u2014 Client Onboard (E2E)* started (`{{ $json.body.status ?? \"manual\" }}`)",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "REPLACE_AFTER_IMPORT",
+          "name": "Slack Bot (ops-agent)"
+        }
+      }
+    },
+    {
+      "id": "c30a1d7e-32e1-4ba1-b9b3-a326e29a7640",
+      "name": "Phase 5 Result",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        990
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "phase5-result",
+        "responseMode": "responseNode"
+      },
+      "webhookId": "f32934ac-ab17-476e-946a-94e410d2618c"
+    },
+    {
+      "id": "d8370efc-5749-4096-8da8-737b3cdad180",
+      "name": "Ack P5 Result",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        260,
+        990
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({received: true, phase: $json.body.phase ?? null, status: $json.body.status ?? null}) }}"
+      }
+    },
+    {
+      "id": "eb2e66f0-a8a3-4859-92d0-7e06d3b997a7",
+      "name": "Post P5 Result",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        520,
+        990
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0BENNUJJT1",
+          "mode": "id"
+        },
+        "text": "={{ ($json.body.status === \"success\" ? \"\u2705\" : \"\u274c\") }} *Phase 5 \u2014 Client Onboard (E2E)*: `{{ $json.body.status }}`\n{{ $json.body.detail ?? \"\" }}",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "REPLACE_AFTER_IMPORT",
+          "name": "Slack Bot (ops-agent)"
+        }
+      }
+    },
+    {
+      "id": "0688610b-11db-47ee-b9fb-f53145e2195e",
+      "name": "Deploy Complete",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        1100
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "deploy-complete",
+        "responseMode": "responseNode"
+      },
+      "webhookId": "1076c36d-f3e4-4361-ba5d-4ef7722e568a"
+    },
+    {
+      "id": "2c8a988f-24a8-427a-9e3b-d919940fef60",
+      "name": "Ack Complete",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        260,
+        1100
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({received: true, phase: $json.body.phase ?? null, status: $json.body.status ?? null}) }}"
+      }
+    },
+    {
+      "id": "f2a26471-33a6-4b77-9402-837f35fc7f0e",
+      "name": "Post Complete",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        520,
+        1100
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0BENNUJJT1",
+          "mode": "id"
+        },
+        "text": "=\ud83c\udf89 *PNetLab deployment complete* \u2014 all 5 phases verified.\n{{ $json.body.detail ?? \"\" }}",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "REPLACE_AFTER_IMPORT",
+          "name": "Slack Bot (ops-agent)"
+        }
+      }
+    },
+    {
+      "id": "c05f2959-e25d-46d8-86be-fb936a292b58",
+      "name": "Note a4bf6732",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -520,
+        0
+      ],
+      "parameters": {
+        "content": "## Phase Orchestrator\n11 webhooks: phase{1..5}-start, phase{1..5}-result, deploy-complete.\n\nAnsible phase playbooks POST results here (see playbooks/tasks/notify_n8n.yml); results are echoed back (`{received:true,...}`) and announced in #ops-agent.\n\n**Setup after import:** attach the `Slack Bot (ops-agent)` credential to every Slack node, then Activate.",
+        "width": 460,
+        "height": 300
+      }
+    }
+  ],
+  "connections": {
+    "Phase 1 Start": {
+      "main": [
+        [
+          {
+            "node": "Ack P1 Start",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ack P1 Start": {
+      "main": [
+        [
+          {
+            "node": "Announce P1 Start",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 1 Result": {
+      "main": [
+        [
+          {
+            "node": "Ack P1 Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ack P1 Result": {
+      "main": [
+        [
+          {
+            "node": "Post P1 Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 2 Start": {
+      "main": [
+        [
+          {
+            "node": "Ack P2 Start",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ack P2 Start": {
+      "main": [
+        [
+          {
+            "node": "Announce P2 Start",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 2 Result": {
+      "main": [
+        [
+          {
+            "node": "Ack P2 Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ack P2 Result": {
+      "main": [
+        [
+          {
+            "node": "Post P2 Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 3 Start": {
+      "main": [
+        [
+          {
+            "node": "Ack P3 Start",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ack P3 Start": {
+      "main": [
+        [
+          {
+            "node": "Announce P3 Start",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 3 Result": {
+      "main": [
+        [
+          {
+            "node": "Ack P3 Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ack P3 Result": {
+      "main": [
+        [
+          {
+            "node": "Post P3 Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 4 Start": {
+      "main": [
+        [
+          {
+            "node": "Ack P4 Start",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ack P4 Start": {
+      "main": [
+        [
+          {
+            "node": "Announce P4 Start",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 4 Result": {
+      "main": [
+        [
+          {
+            "node": "Ack P4 Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ack P4 Result": {
+      "main": [
+        [
+          {
+            "node": "Post P4 Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 5 Start": {
+      "main": [
+        [
+          {
+            "node": "Ack P5 Start",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ack P5 Start": {
+      "main": [
+        [
+          {
+            "node": "Announce P5 Start",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 5 Result": {
+      "main": [
+        [
+          {
+            "node": "Ack P5 Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ack P5 Result": {
+      "main": [
+        [
+          {
+            "node": "Post P5 Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deploy Complete": {
+      "main": [
+        [
+          {
+            "node": "Ack Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ack Complete": {
+      "main": [
+        [
+          {
+            "node": "Post Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false,
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

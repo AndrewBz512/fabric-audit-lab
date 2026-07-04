@@ -1,0 +1,16 @@
+# Master orchestrator — 5 phases, strictly sequential with gates.
+# Each phase playbook verifies its own work and fails hard on any miss, so a
+# broken phase stops the run before the next phase touches anything.
+#
+#   ansible-playbook site.yml --ask-vault-pass              # full run
+#   ansible-playbook site.yml --tags phase3 --ask-vault-pass # single phase
+#   ansible-playbook site.yml --check --diff --ask-vault-pass # dry run
+#
+# Phase results POST to N8N on devbox-104 (webhook/phaseN-result) and land in
+# Slack #ops-agent via the phase orchestrator workflow.
+---
+- import_playbook: playbooks/phases/phase1_core_switching.yml
+- import_playbook: playbooks/phases/phase2_routing_underlay.yml
+- import_playbook: playbooks/phases/phase3_overlay_vxlan.yml
+- import_playbook: playbooks/phases/phase4_edge_wan.yml
+- import_playbook: playbooks/phases/phase5_client_onboard.yml

@@ -1,0 +1,11 @@
+# Collections for the PNetLab phase playbooks.
+# cisco.nxos is PINNED (risk register: an untested collection bump against the
+# lab's NX-OSv image can break Phase 3 silently). Bump deliberately.
+---
+collections:
+  - name: cisco.ios
+    version: ">=9.0.0,<10.0.0"
+  - name: cisco.nxos
+    version: "==9.2.1"
+  - name: ansible.netcommon
+    version: ">=7.0.0"

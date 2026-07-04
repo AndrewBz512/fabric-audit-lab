@@ -1,0 +1,87 @@
+# Phase 2 — Distribution routing underlay (IOS): Loopback0, OSPF area 0, timers.
+#
+# GAP NOTE: uses `ios_config` instead of `ios_ospfv2` deliberately — the
+# resource module requires IOS-XE 16.x+, and PNetLab distribution nodes may be
+# classic IOSv. Raw `router ospf` blocks work on both.
+---
+- name: "Phase 2 — Routing underlay (OSPF area 0, loopbacks, timers)"
+  hosts: distribution
+  gather_facts: false
+  tags: [phase2]
+
+  tasks:
+    - name: Phase 2 configuration
+      block:
+        - name: Configure Loopback0
+          cisco.ios.ios_config:
+            lines:
+              - "ip address {{ loopbacks[inventory_hostname] }} 255.255.255.255"
+              - "ip ospf {{ ospf_process_id }} area {{ ospf_area }}"
+            parents: interface Loopback0
+
+        - name: Configure OSPF process
+          cisco.ios.ios_config:
+            lines:
+              - "router-id {{ loopbacks[inventory_hostname] }}"
+              - passive-interface default
+              - no passive-interface GigabitEthernet0/0
+              - no passive-interface GigabitEthernet0/1
+            parents: "router ospf {{ ospf_process_id }}"
+
+        - name: Advertise networks into area 0
+          cisco.ios.ios_config:
+            lines:
+              - "network {{ item }} area {{ ospf_area }}"
+            parents: "router ospf {{ ospf_process_id }}"
+          loop: "{{ ospf_networks }}"
+
+        - name: Tune OSPF timers on transit interfaces
+          cisco.ios.ios_config:
+            lines:
+              - "ip ospf hello-interval {{ ospf_hello_interval }}"
+              - "ip ospf dead-interval {{ ospf_dead_interval }}"
+            parents: "interface {{ item }}"
+          loop:
+            - GigabitEthernet0/0
+            - GigabitEthernet0/1
+
+        # ---- verify ----
+        - name: Wait for OSPF adjacency to settle
+          cisco.ios.ios_command:
+            commands:
+              - show ip ospf neighbor
+            wait_for:
+              - result[0] contains FULL
+            retries: 12
+            interval: 10
+          register: ospf_neigh
+
+        - name: Assert the peer distribution router is a FULL neighbor
+          ansible.builtin.assert:
+            that:
+              - ospf_neigh.stdout[0] is search('FULL')
+            fail_msg: "No FULL OSPF adjacency on {{ inventory_hostname }}"
+            quiet: true
+
+        - name: Save running-config
+          cisco.ios.ios_config:
+            save_when: modified
+
+        - name: Report success to N8N
+          ansible.builtin.include_tasks: ../tasks/notify_n8n.yml
+          vars:
+            phase_id: phase2
+            phase_status: success
+            phase_detail: "OSPF area {{ ospf_area }} FULL on {{ ansible_play_hosts_all | join('/') }}"
+
+      rescue:
+        - name: Report failure to N8N
+          ansible.builtin.include_tasks: ../tasks/notify_n8n.yml
+          vars:
+            phase_id: phase2
+            phase_status: failed
+            phase_detail: "{{ ansible_failed_task.name | default('unknown task') }} failed on {{ inventory_hostname }}"
+
+        - name: Fail the phase (gate for site.yml)
+          ansible.builtin.fail:
+            msg: "Phase 2 failed — see task output above."

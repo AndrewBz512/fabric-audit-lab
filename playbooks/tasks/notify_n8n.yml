@@ -1,0 +1,22 @@
+# Shared task: POST a phase result to the N8N phase orchestrator on devbox-104.
+# Expects: phase_id (e.g. "phase1"), phase_status ("success"|"failed"),
+#          phase_detail (short human string).
+---
+- name: "Notify N8N — {{ phase_id }} {{ phase_status }}"
+  ansible.builtin.uri:
+    url: "{{ n8n_base_url }}/webhook/{{ phase_id }}-result"
+    method: POST
+    body_format: json
+    body:
+      phase: "{{ phase_id }}"
+      status: "{{ phase_status }}"
+      detail: "{{ phase_detail | default('') }}"
+      host_summary: "{{ ansible_play_hosts_all | join(',') }}"
+    status_code: [200, 201]
+    timeout: 10
+  delegate_to: localhost
+  run_once: true
+  become: false
+  when: n8n_notify | bool
+  # A dead webhook must not fail the network change itself.
+  failed_when: false
