@@ -1,0 +1,38 @@
+name: fabric-audit-4node
+prefix: clab
+
+mgmt:
+  network: mgmt-net
+  ipv4-subnet: 172.20.20.0/24
+
+# ------------------------------------------------------------------
+# 2 spines + 2 leaves, full mesh between tiers.
+# Default image is Arista cEOS (swap to vr-n9kv for Nexus if desired).
+# cEOS is container-native and runs ~1 GB RAM per node, so all four
+# fit comfortably on the 16 GB Docker host.
+# ------------------------------------------------------------------
+
+topology:
+  kinds:
+    ceos:
+      image: ceos:4.30.0F
+
+  nodes:
+    spine1:
+      kind: ceos
+      mgmt-ipv4: 172.20.20.11
+    spine2:
+      kind: ceos
+      mgmt-ipv4: 172.20.20.12
+    leaf1:
+      kind: ceos
+      mgmt-ipv4: 172.20.20.21
+    leaf2:
+      kind: ceos
+      mgmt-ipv4: 172.20.20.22
+
+  links:
+    - endpoints: ["spine1:eth1", "leaf1:eth1"]
+    - endpoints: ["spine1:eth2", "leaf2:eth1"]
+    - endpoints: ["spine2:eth1", "leaf1:eth2"]
+    - endpoints: ["spine2:eth2", "leaf2:eth2"]
