@@ -8,3 +8,6 @@ __pycache__/
 collections/
 *.log
 known_hosts*
+*.iso
+.vault_pass
+ansible_collections/

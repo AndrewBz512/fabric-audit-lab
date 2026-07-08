@@ -1,0 +1,26 @@
+{
+  "folders": [
+    { "name": "pnetlab-playbooks", "path": "." }
+  ],
+  "settings": {
+    "files.associations": {
+      "*.yml": "ansible",
+      "ansible.cfg": "ini"
+    },
+    "ansible.python.interpreterPath": "/usr/bin/python3",
+    "ansible.validation.lint.enabled": true,
+    "files.exclude": {
+      "**/__pycache__": true,
+      "**/*.retry": true,
+      "collections/": true
+    },
+    "terminal.integrated.cwd": "/opt/pnetlab-playbooks"
+  },
+  "extensions": {
+    "recommendations": [
+      "redhat.ansible",
+      "redhat.vscode-yaml",
+      "ms-python.python"
+    ]
+  }
+}

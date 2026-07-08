@@ -1,0 +1,498 @@
+{
+  "name": "PNetLab Slack ChatOps",
+  "nodes": [
+    {
+      "id": "9a9a9610-febc-45de-8145-3446af249fa7",
+      "name": "Slack Events",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "slack-chatops",
+        "responseMode": "responseNode"
+      },
+      "webhookId": "ea08e78e-d135-48da-b232-65ee9c3e2337"
+    },
+    {
+      "id": "e350c2b4-8dee-4e8b-bf4b-4944a7c33e4c",
+      "name": "Is URL Verification?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.body.type }}",
+              "rightValue": "url_verification",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "3d41e89c-7590-490d-be54-d7cc798cf13b",
+      "name": "Respond Challenge",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        180
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({challenge: $json.body.challenge}) }}"
+      }
+    },
+    {
+      "id": "8d7a7984-8107-47cf-981f-4776257f1709",
+      "name": "Respond OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        420
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ok: true}) }}"
+      }
+    },
+    {
+      "id": "6e219284-758c-4a1a-8842-6aff679467a6",
+      "name": "Parse Command",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        420
+      ],
+      "parameters": {
+        "jsCode": "// Slack event -> {command, phase, channel, user}\nconst body = $input.first().json.body ?? {};\nconst ev = body.event ?? {};\n// ignore bot echoes and message edits, or the bot loops on its own replies\nif (!ev.type || ev.bot_id || ev.subtype) { return []; }\nconst text = (ev.text || '').replace(/<@[^>]+>/g, '').trim().toLowerCase();\nlet command = 'unknown', phase = null;\nif (/^help\\b/.test(text)) command = 'help';\nelse if (/^status\\b/.test(text)) command = 'status';\nelse if (/^run\\s+all\\b/.test(text)) command = 'run_all';\nelse { const m = text.match(/^(?:run\\s+)?phase\\s*([1-5])\\b/); if (m) { command = 'phase'; phase = m[1]; } }\nreturn [{ json: { command, phase, channel: ev.channel, user: ev.user, raw: text } }];\n"
+      }
+    },
+    {
+      "id": "187d4128-9dfb-4a41-b39f-2fe9baf377bf",
+      "name": "Route Command",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        960,
+        420
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "outputKey": "help",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "typeValidation": "loose"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.command }}",
+                    "rightValue": "help",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true
+            },
+            {
+              "outputKey": "status",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "typeValidation": "loose"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.command }}",
+                    "rightValue": "status",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true
+            },
+            {
+              "outputKey": "run",
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "typeValidation": "loose"
+                },
+                "combinator": "or",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.command }}",
+                    "rightValue": "run_all",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  },
+                  {
+                    "leftValue": "={{ $json.command }}",
+                    "rightValue": "phase",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      }
+    },
+    {
+      "id": "7e4087f4-d627-45fd-a157-375c11c1e958",
+      "name": "Post Help",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        1220,
+        120
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "={{ $('Parse Command').first().json.channel }}",
+          "mode": "id"
+        },
+        "text": "=*PNetLab ChatOps \u2014 Available Commands*\n\u2022 `phase 1` \u2014 Core Switching (VLANs, STP, trunks)\n\u2022 `phase 2` \u2014 Routing Underlay (OSPF area 0)\n\u2022 `phase 3` \u2014 Overlay VXLAN (BGP EVPN, NX-OS)\n\u2022 `phase 4` \u2014 Edge WAN (NAT/PAT, ACL)\n\u2022 `phase 5` \u2014 Client Onboard (DHCP, E2E ping)\n\u2022 `run all` \u2014 full site.yml, phases 1-5 with gates\n\u2022 `status` \u2014 devbox-104 health + PNetLab reachability\n\u2022 `help` \u2014 this message",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "REPLACE_AFTER_IMPORT",
+          "name": "Slack Bot (ops-agent)"
+        }
+      }
+    },
+    {
+      "id": "359ed055-e27a-42e6-bd09-52374628d6d8",
+      "name": "Devbox Status",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        1220,
+        300
+      ],
+      "parameters": {
+        "authentication": "privateKey",
+        "command": "uptime && echo \"---\" && docker ps --format \"table {{.Names}}\\t{{.Status}}\" && echo \"---\" && ip route show 172.100.1.0/24 && (ping -c 1 -W 2 172.100.1.101 >/dev/null 2>&1 && echo \"PNetLab mgmt net: reachable\" || echo \"PNetLab mgmt net: UNREACHABLE\")",
+        "cwd": "/opt/pnetlab-playbooks"
+      },
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "REPLACE_AFTER_IMPORT",
+          "name": "devbox-104 SSH"
+        }
+      }
+    },
+    {
+      "id": "ea4d5b42-e3ec-4745-bf84-81ca9d0f913c",
+      "name": "Post Status",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        1460,
+        300
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "={{ $('Parse Command').first().json.channel }}",
+          "mode": "id"
+        },
+        "text": "=*devbox-104 status*\n```{{ $json.stdout ?? \"no output\" }}```",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "REPLACE_AFTER_IMPORT",
+          "name": "Slack Bot (ops-agent)"
+        }
+      }
+    },
+    {
+      "id": "7f29b3f7-4036-4a51-9477-098c922edaad",
+      "name": "Post Started",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        1220,
+        480
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "={{ $('Parse Command').first().json.channel }}",
+          "mode": "id"
+        },
+        "text": "=\ud83d\ude80 Starting `{{ $json.command === \"phase\" ? \"phase \" + $json.phase : \"all phases\" }}` \u2014 output will follow when the run finishes.",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "REPLACE_AFTER_IMPORT",
+          "name": "Slack Bot (ops-agent)"
+        }
+      }
+    },
+    {
+      "id": "50b31d30-6a04-4bda-b0a5-a82ca06f28a0",
+      "name": "Run Playbook",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        1220,
+        640
+      ],
+      "parameters": {
+        "authentication": "privateKey",
+        "command": "=cd /opt/pnetlab-playbooks && ansible-playbook site.yml{{ $('Parse Command').first().json.command === \"phase\" ? \" --tags phase\" + $('Parse Command').first().json.phase : \"\" }} --vault-password-file ~/.vault_pass 2>&1 | tail -n 40",
+        "cwd": "/opt/pnetlab-playbooks"
+      },
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "REPLACE_AFTER_IMPORT",
+          "name": "devbox-104 SSH"
+        }
+      }
+    },
+    {
+      "id": "5c74ea19-2f6c-41f9-b210-374f43530d9b",
+      "name": "Post Run Result",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        1460,
+        640
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "={{ $('Parse Command').first().json.channel }}",
+          "mode": "id"
+        },
+        "text": "={{ ($json.stdout ?? \"\").includes(\"failed=0\") ? \"\u2705\" : \"\u26a0\ufe0f\" }} *Playbook finished*\n```{{ $json.stdout ?? \"no output\" }}```",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "REPLACE_AFTER_IMPORT",
+          "name": "Slack Bot (ops-agent)"
+        }
+      }
+    },
+    {
+      "id": "656edbba-41f6-4a9f-96ba-d1dafae42f44",
+      "name": "Post Unknown",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        1220,
+        820
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "={{ $('Parse Command').first().json.channel }}",
+          "mode": "id"
+        },
+        "text": "=\u2753 Unknown command `{{ $json.raw }}` \u2014 try `help`.",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "REPLACE_AFTER_IMPORT",
+          "name": "Slack Bot (ops-agent)"
+        }
+      }
+    },
+    {
+      "id": "4de2932a-c967-4507-8880-62203913682b",
+      "name": "Note a7126ccc",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -520,
+        100
+      ],
+      "parameters": {
+        "content": "## Slack ChatOps loop\nSlack Events API -> `/webhook/slack-chatops` -> parse command -> SSH to devbox-104 -> ansible-playbook -> result back to the originating channel.\n\n**Setup after import:**\n1. Create `devbox-104 SSH` credential (SSH private key \u2014 Credentials store, NOT Variables).\n2. Attach `Slack Bot (ops-agent)` credential to Slack nodes.\n3. On devbox-104: `echo <vault-pass> > ~/.vault_pass && chmod 600 ~/.vault_pass`.\n4. Activate, then point the Slack app Event Subscriptions at this webhook.",
+        "width": 460,
+        "height": 320
+      }
+    }
+  ],
+  "connections": {
+    "Slack Events": {
+      "main": [
+        [
+          {
+            "node": "Is URL Verification?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is URL Verification?": {
+      "main": [
+        [
+          {
+            "node": "Respond Challenge",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond OK": {
+      "main": [
+        [
+          {
+            "node": "Parse Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Command": {
+      "main": [
+        [
+          {
+            "node": "Route Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Command": {
+      "main": [
+        [
+          {
+            "node": "Post Help",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Devbox Status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Post Started",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Run Playbook",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Post Unknown",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Devbox Status": {
+      "main": [
+        [
+          {
+            "node": "Post Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Playbook": {
+      "main": [
+        [
+          {
+            "node": "Post Run Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false,
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

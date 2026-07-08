@@ -1,0 +1,102 @@
+# Phase 1 — Core/Access switching (IOS): VLANs, rapid-PVST, trunk/access ports.
+#
+# GAP NOTE: written with cisco.ios resource-agnostic `ios_config` blocks on
+# purpose — the PNetLab nodes may be classic IOSv (not IOS-XE), where the
+# ios_vlans/ios_l2_interfaces resource modules are unreliable. Raw blocks work
+# on both.
+---
+- name: "Phase 1 — Core/Access switching (VLANs, STP, trunks)"
+  hosts: core_access
+  gather_facts: false
+  tags: [phase1]
+
+  tasks:
+    - name: Phase 1 configuration
+      block:
+        - name: Create VLANs
+          cisco.ios.ios_config:
+            lines:
+              - "name {{ item.name }}"
+            parents: "vlan {{ item.id }}"
+          loop: "{{ vlans }}"
+          loop_control:
+            label: "vlan {{ item.id }} ({{ item.name }})"
+
+        - name: Enable rapid-PVST
+          cisco.ios.ios_config:
+            lines:
+              - spanning-tree mode rapid-pvst
+
+        - name: Set STP root primary on the primary core
+          cisco.ios.ios_config:
+            lines:
+              - "spanning-tree vlan 1-4094 root primary"
+          when: inventory_hostname == stp_root_primary_host
+
+        - name: Set STP root secondary on the backup core
+          cisco.ios.ios_config:
+            lines:
+              - "spanning-tree vlan 1-4094 root secondary"
+          when: inventory_hostname == stp_root_secondary_host
+
+        - name: Configure trunk interfaces
+          cisco.ios.ios_config:
+            lines:
+              - switchport trunk encapsulation dot1q
+              - switchport mode trunk
+              - "switchport trunk native vlan {{ native_vlan }}"
+              - "switchport trunk allowed vlan {{ trunk_vlans }}"
+              - no shutdown
+            parents: "interface {{ item }}"
+          loop: "{{ trunk_interfaces[inventory_hostname] | default([]) }}"
+
+        - name: Configure access interfaces (with portfast + bpduguard)
+          cisco.ios.ios_config:
+            lines:
+              - switchport mode access
+              - "switchport access vlan {{ access_vlan }}"
+              - spanning-tree portfast
+              - spanning-tree bpduguard enable
+              - no shutdown
+            parents: "interface {{ item }}"
+          loop: "{{ access_interfaces[inventory_hostname] | default([]) }}"
+
+        # ---- verify ----
+        - name: Collect VLAN table
+          cisco.ios.ios_command:
+            commands:
+              - show vlan brief
+          register: vlan_out
+
+        - name: Assert every planned VLAN exists
+          ansible.builtin.assert:
+            that:
+              - vlan_out.stdout[0] is search('(^|\n)' ~ item.id ~ '\\s+' ~ item.name)
+            fail_msg: "VLAN {{ item.id }} ({{ item.name }}) missing on {{ inventory_hostname }}"
+            quiet: true
+          loop: "{{ vlans }}"
+          loop_control:
+            label: "vlan {{ item.id }}"
+
+        - name: Save running-config
+          cisco.ios.ios_config:
+            save_when: modified
+
+        - name: Report success to N8N
+          ansible.builtin.include_tasks: ../tasks/notify_n8n.yml
+          vars:
+            phase_id: phase1
+            phase_status: success
+            phase_detail: "VLANs {{ vlans | map(attribute='id') | join('/') }} + rapid-PVST verified on {{ ansible_play_hosts_all | length }} switches"
+
+      rescue:
+        - name: Report failure to N8N
+          ansible.builtin.include_tasks: ../tasks/notify_n8n.yml
+          vars:
+            phase_id: phase1
+            phase_status: failed
+            phase_detail: "{{ ansible_failed_task.name | default('unknown task') }} failed on {{ inventory_hostname }}"
+
+        - name: Fail the phase (gate for site.yml)
+          ansible.builtin.fail:
+            msg: "Phase 1 failed — see task output above."

@@ -1,0 +1,95 @@
+# Phase 5 — Client onboarding + end-to-end validation (Linux VMs).
+# DHCP on the data interface, then E2E ping across every tier and a traceroute
+# to the edge — this is the acceptance gate for the whole fabric.
+---
+- name: "Phase 5 — Client onboarding (DHCP, E2E ping, traceroute)"
+  hosts: clients
+  gather_facts: true
+  tags: [phase5]
+
+  tasks:
+    - name: Phase 5 onboarding
+      block:
+        - name: Request DHCP lease on the data interface
+          ansible.builtin.command: "dhclient -v {{ client_dhcp_interface }}"
+          register: dhcp_out
+          changed_when: "'bound to' in dhcp_out.stderr"
+          failed_when:
+            - dhcp_out.rc != 0
+            - "'already' not in dhcp_out.stderr"
+
+        - name: Read address on the data interface
+          ansible.builtin.command: "ip -4 -o addr show dev {{ client_dhcp_interface }}"
+          register: addr_out
+          changed_when: false
+
+        - name: Assert the client got an IPv4 address
+          ansible.builtin.assert:
+            that:
+              - "'inet ' in addr_out.stdout"
+            fail_msg: "{{ inventory_hostname }} has no IPv4 lease on {{ client_dhcp_interface }}"
+            quiet: true
+
+        # ---- E2E validation across the fabric ----
+        - name: Ping every tier (core, distribution, edge)
+          ansible.builtin.command: "ping -c 3 -W 2 {{ item }}"
+          loop: "{{ e2e_ping_targets }}"
+          register: ping_out
+          changed_when: false
+
+        - name: Client-to-client ping (east-west across the overlay)
+          ansible.builtin.command:
+            argv:
+              - ping
+              - -c
+              - "3"
+              - -W
+              - "2"
+              - "{{ hostvars[(groups['clients'] | difference([inventory_hostname])) | first].ansible_host }}"
+          changed_when: false
+
+        - name: Traceroute to the edge (path visibility)
+          ansible.builtin.command: "traceroute -n -w 2 -m 15 {{ e2e_traceroute_target }}"
+          register: trace_out
+          changed_when: false
+
+        - name: Show traceroute path
+          ansible.builtin.debug:
+            msg: "{{ trace_out.stdout_lines }}"
+
+        - name: Report success to N8N
+          ansible.builtin.include_tasks: ../tasks/notify_n8n.yml
+          vars:
+            phase_id: phase5
+            phase_status: success
+            phase_detail: "DHCP lease OK; E2E ping to {{ e2e_ping_targets | join('/') }} + client-to-client passed"
+
+        # Whole-deployment completion signal (fires once, after the last gate)
+        - name: Notify N8N — deployment complete
+          ansible.builtin.uri:
+            url: "{{ n8n_base_url }}/webhook/deploy-complete"
+            method: POST
+            body_format: json
+            body:
+              phase: all
+              status: success
+              detail: "All 5 phases verified end-to-end"
+            status_code: [200, 201]
+            timeout: 10
+          delegate_to: localhost
+          run_once: true
+          become: false
+          when: n8n_notify | bool
+          failed_when: false
+
+      rescue:
+        - name: Report failure to N8N
+          ansible.builtin.include_tasks: ../tasks/notify_n8n.yml
+          vars:
+            phase_id: phase5
+            phase_status: failed
+            phase_detail: "{{ ansible_failed_task.name | default('unknown task') }} failed on {{ inventory_hostname }}"
+
+        - name: Fail the phase (gate for site.yml)
+          ansible.builtin.fail:
+            msg: "Phase 5 failed — see task output above."

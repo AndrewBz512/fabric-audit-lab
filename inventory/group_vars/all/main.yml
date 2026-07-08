@@ -1,0 +1,76 @@
+# Design data shared by all phases. Secrets live in vault.yml next to this
+# file (ansible-vault create inventory/group_vars/all/vault.yml — not in git).
+---
+# ---- N8N phase-result callbacks (devbox-104) ----
+n8n_base_url: "http://192.168.1.104:5678"
+n8n_notify: true          # set false (-e n8n_notify=false) for offline runs
+
+# ---- Phase 1: VLAN / STP plan ----
+vlans:
+  - { id: 10, name: USERS }
+  - { id: 20, name: SERVERS }
+  - { id: 30, name: MGMT }
+  - { id: 99, name: NATIVE }
+trunk_vlans: "10,20,30,99"
+native_vlan: 99
+access_vlan: 10
+# core1 is STP root primary, core2 secondary (rapid-pvst)
+stp_root_primary_host: core1
+stp_root_secondary_host: core2
+# Interface roles — adjust to match the PNetLab topology cabling
+trunk_interfaces:
+  core1:   ["GigabitEthernet0/1", "GigabitEthernet0/2", "GigabitEthernet0/3"]
+  core2:   ["GigabitEthernet0/1", "GigabitEthernet0/2", "GigabitEthernet0/3"]
+  access1: ["GigabitEthernet0/1", "GigabitEthernet0/2"]
+  access2: ["GigabitEthernet0/1", "GigabitEthernet0/2"]
+access_interfaces:
+  access1: ["GigabitEthernet0/3"]
+  access2: ["GigabitEthernet0/3"]
+
+# ---- Phase 2: OSPF underlay ----
+ospf_process_id: 1
+ospf_area: 0
+ospf_hello_interval: 5
+ospf_dead_interval: 20
+# Loopback0 per distribution router
+loopbacks:
+  dist1: 10.255.2.1
+  dist2: 10.255.2.2
+# Networks advertised into area 0 (wildcard form for classic IOS `network`)
+ospf_networks:
+  - "10.255.2.0 0.0.0.255"
+  - "172.100.1.0 0.0.0.255"
+
+# ---- Phase 3: BGP EVPN / VXLAN overlay (NX-OS) ----
+bgp_asn: 65000
+vtep_loopbacks:            # Loopback0 = BGP RID + VTEP source
+  spine1: 10.255.3.1
+  spine2: 10.255.3.2
+  leaf1:  10.255.3.11
+  leaf2:  10.255.3.12
+l2_vnis:
+  - { vlan: 10, vni: 10010 }
+  - { vlan: 20, vni: 10020 }
+l3_vni: { vlan: 999, vni: 50001, vrf: TENANT1 }
+nxos_required_features:    # pre-flight check before any overlay config
+  - bgp
+  - nv overlay
+  - vn-segment-vlan-based
+  - interface-vlan
+
+# ---- Phase 4: Edge NAT / WAN ----
+nat_inside_interface: GigabitEthernet0/1
+nat_outside_interface: GigabitEthernet0/0
+nat_acl_number: 10
+nat_inside_networks:       # wildcard form for the standard ACL
+  - "172.100.1.0 0.0.0.255"
+  - "10.0.0.0 0.255.255.255"
+wan_default_gateway: 172.100.1.1   # PNetLab cloud/NAT next hop — confirm in lab
+
+# ---- Phase 5: Client onboarding / E2E validation ----
+client_dhcp_interface: ens3        # confirm interface name on the client VMs
+e2e_ping_targets:
+  - 172.100.1.101   # core1
+  - 172.100.1.111   # dist1
+  - 172.100.1.131   # edge1
+e2e_traceroute_target: 172.100.1.131

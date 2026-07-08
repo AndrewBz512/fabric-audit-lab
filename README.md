@@ -1,5 +1,61 @@
 # fabric-audit-lab
 
+Two related labs live here:
+
+1. **eBGP Clos underlay on Containerlab** (`ebgp/`) — the original local-fabric
+   path: 4 Arista cEOS nodes on `clab-host2` (192.168.1.103). Docs start at
+   [Topology](#topology) below.
+2. **PNetLab ChatOps platform** (repo root) — 5-phase network playbook rollout
+   against 11 PNetLab devices (172.100.1.0/24), driven from Slack `#ops-agent`
+   through N8N on devbox-104 (192.168.1.104). Next section.
+
+---
+
+## PNetLab ChatOps platform
+
+```
+Slack #ops-agent ──POST──► N8N (devbox-104 :5678) ──SSH──► ansible-playbook
+                                                              │
+                              192.168.1.104 ──via .11──► 172.100.1.0/24 (PNetLab)
+```
+
+| Piece | Files |
+|-------|-------|
+| VM provisioning (ESXi .62, on-segment only) | `run-deploy-104.sh` → `deploy-devbox-104.sh`, then `register-netbox-104.sh` |
+| Ansible project | `ansible.cfg`, `inventory/pnetlab.yml`, `site.yml`, `playbooks/phases/phase{1..5}_*.yml` |
+| N8N workflows | `n8n_webhooks/*.json` — import order + credentials in `n8n_webhooks/README.md` |
+| VSCode Remote SSH | `pnetlab.code-workspace` (open on devbox-104 at `/opt/pnetlab-playbooks`) |
+
+Phases (each verifies itself and gates the next; results POST to N8N → Slack):
+
+1. **Core switching** — VLANs, rapid-PVST, trunk/access (IOS)
+2. **Routing underlay** — OSPF area 0, loopbacks, timers (IOS)
+3. **Overlay** — BGP EVPN, NVE, VNI mapping (NX-OS, feature pre-flight)
+4. **Edge WAN** — NAT/PAT, ACL, default route (IOS)
+5. **Client onboard** — DHCP, E2E ping, traceroute (Linux)
+
+Quick start on devbox-104:
+
+```bash
+cd /opt/pnetlab-playbooks
+ansible-vault create inventory/group_vars/all/vault.yml   # vault_device_password, vault_client_password
+# update inventory/pnetlab.yml with the ACTUAL node mgmt IPs from the PNetLab UI
+ansible all -m ping --ask-vault-pass                      # connectivity gate
+ansible-playbook site.yml --check --diff --ask-vault-pass # dry run
+ansible-playbook site.yml --tags phase1 --ask-vault-pass  # then phase2..phase5
+```
+
+Deploy gotchas baked into the scripts: the 192.168.1.0/24 segment has a
+**phantom ICMP responder** (free-IP checks use NetBox + ARP, never ping); the
+ESXi host is standalone (**no vCenter, vApp transport broken** → NoCloud seed
+ISO); the PNetLab route lives in its own netplan file (`60-static-routes.yaml`)
+so reboots don't eat it. Deploy scripts are authored here but **run on-segment
+only** (.100/.95/.103) — never from a sandbox.
+
+---
+
+## eBGP Clos underlay (Containerlab)
+
 Containerlab spine-leaf lab + Ansible IaC for an **eBGP Clos underlay**, running on
 `clab-host2` (192.168.1.103). Four Arista cEOS nodes (2 spine, 2 leaf), configured
 and verified entirely through Ansible.
