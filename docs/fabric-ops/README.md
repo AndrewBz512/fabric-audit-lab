@@ -8,6 +8,7 @@ Kept separate from the eBGP Clos lab under `ebgp/`.
 |---|---|---|
 | `token-rotation-policy.md` | 90-day rotation + freshness gate + `.secrets/fabric.env` as SSOT | DRAFT (item 6.6) |
 | `qdrant-auth-cutover-runbook.md` | Zero-drop cutover of Qdrant `.91` to API-key auth | DRAFT SKELETON (item 5.5) |
+| `qwen-model-swap-runbook.md` | Swap cw-rag generation LLM `llama3.1:8b` → Qwen3 (CPU-only), reversible | DRAFT |
 
 Paired tooling:
 
